@@ -7,6 +7,6 @@ UpgradeBehavior: install
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/AElfat/filo/releases/download/v1.3.0/filo_1.3.0_x64-setup.exe
-    InstallerSha256: 97049F415E2FA407D6638674B29FEC0C1EE84A0252B4FAF39CDCE5635B52A47D
+    InstallerSha256: 7CE2C27C4A9011A2164F13F497F14266BFBEB0A4756643E8FBEFB7114FA65FFE
 ManifestType: installer
 ManifestVersion: 1.6.0
