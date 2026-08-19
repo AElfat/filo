@@ -1,0 +1,13 @@
+Sample notes for filo
+=====================
+
+Orders section
+Order handling needs some care with long-standing customers.
+This line will be a sample link target.
+
+Invoices section
+Invoices must be issued before the end of the month.
+From here you can jump back to the orders section with a link.
+
+Misc section
+Free text, no formatting at all: it is plain text.

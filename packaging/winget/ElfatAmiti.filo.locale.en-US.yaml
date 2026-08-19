@@ -1,0 +1,21 @@
+PackageIdentifier: ElfatAmiti.filo
+PackageVersion: 1.3.0
+PackageLocale: en-US
+Publisher: Elfat Amiti
+PublisherUrl: https://github.com/AElfat
+PublisherSupportUrl: https://github.com/AElfat/filo/issues
+PackageName: filo
+PackageUrl: https://github.com/AElfat/filo
+License: MIT
+LicenseUrl: https://github.com/AElfat/filo/blob/main/LICENSE
+ShortDescription: Minimal text editor focused on editing, with links between lines and pages, footnotes and collapsible line groups. Files stay plain text.
+Tags:
+  - editor
+  - text-editor
+  - notes
+  - note-taking
+  - plain-text
+  - tauri
+Moniker: filo
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

@@ -1,0 +1,7 @@
+# Winget version manifest for filo.
+# Lives in microsoft/winget-pkgs as manifests/e/ElfatAmiti/filo/<version>/
+PackageIdentifier: ElfatAmiti.filo
+PackageVersion: 1.3.0
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0

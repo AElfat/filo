@@ -1,0 +1,12 @@
+PackageIdentifier: ElfatAmiti.filo
+PackageVersion: 1.3.0
+InstallerLocale: en-US
+InstallerType: nullsoft
+Scope: user
+UpgradeBehavior: install
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/AElfat/filo/releases/download/v1.3.0/filo_1.3.0_x64-setup.exe
+    InstallerSha256: 97049F415E2FA407D6638674B29FEC0C1EE84A0252B4FAF39CDCE5635B52A47D
+ManifestType: installer
+ManifestVersion: 1.6.0

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>filo</title>
+  </head>
+  <body>
+    <div id="app">
+      <header id="toolbar" data-tauri-drag-region>
+        <button id="brand" class="brand" title="Info su filo">filo</button>
+        <button id="btn-explorer" title="Esplora risorse (Ctrl+B)"><svg viewBox="0 0 32 32" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="26" height="22" rx="2"/><path d="M11 5v22"/></svg></button>
+        <button id="btn-new" title="Nuovo documento (Ctrl+T)"><svg viewBox="0 0 32 32" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 3H9a2 2 0 0 0-2 2v22a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9z"/><path d="M19 3v6h6"/><path d="M15 17v8M11 21h8"/></svg></button>
+        <button id="btn-open" title="Apri file (Ctrl+O)"><svg viewBox="0 0 32 32" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 25V7a2 2 0 0 1 2-2h8l3 4h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
+        <button id="btn-save" title="Salva (Ctrl+S)"><svg viewBox="0 0 32 32" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5h13l7 7v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><path d="M11 5v6h8V5"/><path d="M9 27v-8h14v8"/></svg></button>
+        <button id="btn-save-as" title="Salva come… (Ctrl+Shift+S)"><svg viewBox="0 0 32 32" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5h13l7 7v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><path d="M11 5v6h8V5"/><path d="M15 16v8M11 20h8"/></svg></button>
+        <span class="toolbar-sep"></span>
+        <button id="btn-target" title="Marca/smarca la riga come destinazione (Ctrl+L)">◎</button>
+        <button id="btn-ref" title="Crea un rimando qui (Ctrl+K) — clic destro sul rimando per rimuoverlo">↗</button>
+        <button id="btn-note" title="Nuova nota a piè di pagina (Ctrl+N)">¹</button>
+        <button id="btn-group" title="Raggruppa le righe selezionate (Ctrl+G)">▦</button>
+        <span class="toolbar-sep"></span>
+        <button id="btn-pretty" title="Formatta JSON/XML (Ctrl+Alt+F)">{ }</button>
+        <button id="btn-minify" title="Minifica JSON/XML (Ctrl+Alt+M)">≡</button>
+        <button id="btn-preview" title="Anteprima Markdown (Ctrl+Maiusc+V)" hidden>◨</button>
+        <span class="toolbar-spacer" data-tauri-drag-region></span>
+        <button id="btn-panel-side" title="Pannello collegamenti e gruppi"><svg viewBox="0 0 32 32" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 19a6 6 0 0 0 9 0l3-3a6 6 0 0 0-9-9l-1.5 1.5"/><path d="M19 13a6 6 0 0 0-9 0l-3 3a6 6 0 0 0 9 9l1.5-1.5"/></svg></button>
+        <button id="btn-panel-notes" title="Pannello note"><svg viewBox="0 0 32 32" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 3H9a2 2 0 0 0-2 2v22a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9z"/><path d="M19 3v6h6"/><path d="M11 17h10M11 21h6"/></svg></button>
+        <button id="btn-prefs" title="Impostazioni (Ctrl+,)">⚙</button>
+        <span class="win-controls">
+          <button id="win-min" tabindex="-1">&#xE921;</button>
+          <button id="win-max" tabindex="-1">&#xE922;</button>
+          <button id="win-close" class="win-close" tabindex="-1">&#xE8BB;</button>
+        </span>
+      </header>
+      <div id="main-row">
+        <aside id="explorer" hidden></aside>
+        <div id="main-col">
+          <nav id="tabs"></nav>
+          <div id="work">
+            <div id="center">
+              <main id="editor"></main>
+              <article id="preview" class="markdown-body" hidden></article>
+              <section id="prefs-page" hidden></section>
+              <aside id="notes-panel" hidden></aside>
+            </div>
+            <aside id="side-panel" hidden></aside>
+          </div>
+        </div>
+      </div>
+      <footer id="statusbar">
+        <span id="status-pos">riga 1, colonna 1</span>
+        <span id="status-path" class="status-path"></span>
+        <span id="status-extra"></span>
+        <span class="statusbar-spacer"></span>
+        <span id="status-count" class="status-chip"></span>
+        <span id="status-lang" class="status-chip">testo</span>
+        <span id="status-enc" class="status-chip clickable">UTF-8</span>
+        <span id="status-eol" class="status-chip clickable">CRLF</span>
+      </footer>
+    </div>
+    <div id="print-area"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
