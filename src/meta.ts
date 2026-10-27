@@ -417,7 +417,16 @@ export async function loadSidecar(doc: Doc, diskText: string): Promise<void> {
 // collapsed…) while the document is clean: light debounce.
 const metaTimers = new Map<string, number>();
 
+// The crash-recovery draft of a modified document must follow its
+// metadata too: registered by drafts.ts to avoid a circular import.
+let draftHook: (doc: Doc) => void = () => {};
+
+export function setDraftHook(f: (doc: Doc) => void) {
+  draftHook = f;
+}
+
 export function saveMetaSoon(doc: Doc) {
+  if (doc.dirty) draftHook(doc);
   if (!doc.path || doc.dirty) return; // if dirty, it saves with the document
   window.clearTimeout(metaTimers.get(doc.id));
   metaTimers.set(

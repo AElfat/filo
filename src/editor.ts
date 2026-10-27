@@ -39,6 +39,7 @@ import {
   foldGutter,
   foldKeymap,
   indentOnInput,
+  indentUnit,
   syntaxHighlighting,
 } from "@codemirror/language";
 import { lintGutter } from "@codemirror/lint";
@@ -69,9 +70,11 @@ export const fontCompartment = new Compartment();
 export const wrapCompartment = new Compartment(); // word wrap
 export const extrasCompartment = new Compartment(); // lint and per-language tools
 
+// Indentation unit: a tab for text, like the Tab key inserts; two
+// spaces for JSON/XML, the same the formatter (Ctrl+Alt+F) produces.
 export function langExtension(lang: Lang): Extension {
-  if (lang === "json") return json();
-  if (lang === "xml") return xml();
+  if (lang === "json") return [json(), indentUnit.of("  ")];
+  if (lang === "xml") return [xml(), indentUnit.of("  ")];
   if (lang === "markdown") return markdown();
   return [];
 }
@@ -210,6 +213,7 @@ export function buildDocState(
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       phrasesIt,
       languageCompartment.of(langExtension(lang)),
+      indentUnit.of("\t"), // overridden by the language where needed
       themeCompartment.of(themeExtension(prefs)),
       fontCompartment.of(fontExtension(prefs)),
       wrapCompartment.of(wrapExtension(prefs)),

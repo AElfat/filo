@@ -35,6 +35,7 @@ import { redo, selectAll, undo } from "@codemirror/commands";
 import { findNext, findPrevious } from "@codemirror/search";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { showAbout } from "./about";
+import { clearDrafts, recoverDrafts, scheduleDraft } from "./drafts";
 import { applyPreviewState, initPreview, isPreview, togglePreview } from "./preview";
 import { setLang, t } from "./i18n";
 import "./styles.css";
@@ -292,6 +293,8 @@ async function boot() {
       // markActiveDirty calls onUpdate only on the clean → dirty
       // transition: no extra work on every keystroke
       docs.markActiveDirty();
+      const active = docs.activeDoc();
+      if (active) scheduleDraft(active); // crash recovery, debounced
     },
     cursorMoved(line, col) {
       el.statusPos.textContent = t("status.pos", line, col);
@@ -312,7 +315,12 @@ async function boot() {
   const restored = await docs.restoreSession();
   const cli = await invoke<string[]>("get_cli_files");
   for (const p of cli) await docs.openPath(p);
-  if (!restored && cli.length === 0) docs.newDoc();
+  // unsaved text left by a crash comes back as modified tabs
+  const recovered = await recoverDrafts();
+  if (recovered.length > 0) {
+    showNotice(t("recover.notice", recovered.join(", ")));
+  }
+  if (!restored && cli.length === 0 && recovered.length === 0) docs.newDoc();
 
   // Second instance ("Open with filo"): receives the paths and opens them here.
   await listen<string[]>("open-files", async (e) => {
@@ -352,6 +360,7 @@ async function boot() {
       }
     }
     closing = true;
+    await clearDrafts(); // clean exit: nothing to recover next time
     await docs.saveSession();
     await getCurrentWindow().destroy();
   });
@@ -849,13 +858,19 @@ async function closeOtherTabs(keepId: string) {
 }
 
 function wireStatusbar() {
-  // Click on the encoding: toggles UTF-8 ⇄ Windows-1252 (applied on save).
-  // The title is set by applyStaticI18n.
+  // Click on the encoding: cycles UTF-8 → Windows-1252 → UTF-16 LE
+  // (applied on save). The title is set by applyStaticI18n.
+  const nextEncoding: Record<string, string> = {
+    "utf-8": "windows-1252",
+    "windows-1252": "utf-16le",
+    "utf-16le": "utf-8",
+    "utf-16be": "utf-8",
+  };
   el.statusEnc.addEventListener("click", () => {
     const doc = docs.activeDoc();
     if (!doc) return;
-    doc.encoding = doc.encoding === "utf-8" ? "windows-1252" : "utf-8";
-    if (doc.encoding === "windows-1252") doc.bom = false;
+    doc.encoding = nextEncoding[doc.encoding] ?? "utf-8";
+    doc.bom = doc.encoding === "utf-16le"; // Windows writes UTF-16 with BOM
     doc.dirty = true;
     onUpdate();
   });
@@ -869,15 +884,19 @@ function wireStatusbar() {
   });
 }
 
-// Unexpected errors must never be silent: they show up in the status
-// bar instead of vanishing into the console.
-function showError(msg: string) {
-  el.statusExtra.textContent = `⚠ ${msg}`;
-  el.statusExtra.style.color = "var(--danger)";
+// Notices and errors go to the status bar; errors must never be
+// silent, so they land here instead of vanishing into the console.
+function showNotice(msg: string, danger = false) {
+  el.statusExtra.textContent = danger ? `⚠ ${msg}` : msg;
+  el.statusExtra.style.color = danger ? "var(--danger)" : "";
   window.setTimeout(() => {
     el.statusExtra.textContent = "";
     el.statusExtra.style.color = "";
   }, 8000);
+}
+
+function showError(msg: string) {
+  showNotice(msg, true);
 }
 window.addEventListener("error", (e) => showError(e.message));
 window.addEventListener("unhandledrejection", (e) =>

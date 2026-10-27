@@ -38,10 +38,14 @@ the panel — never silently lost.
   e.g. `orders[0].customer.name`. Syntax highlighting exists only for
   these formats — everything else is plain text, on purpose.
 - File explorer sidebar (Ctrl+B) with favorite folders and a quick filter.
-- UTF-8 and Windows-1252 with automatic detection, CRLF/LF line endings;
-  both switchable with a click in the status bar.
+- UTF-8, UTF-16 and Windows-1252 with automatic detection (UTF-16 even
+  without BOM, as PowerShell 5 writes it), CRLF/LF line endings; both
+  switchable with a click in the status bar.
 - Atomic saves with rotating backups: the last ten copies of every file
   are kept in `%APPDATA%\io.github.aelfat.filo\backups`.
+- Unsaved text survives a crash: modified documents are mirrored to
+  `%APPDATA%\io.github.aelfat.filo\drafts` as you type and come back as
+  modified tabs at the next start. A clean exit leaves nothing behind.
 - Search and replace with regex and whole-word matching (Ctrl+F), F3 for
   the next match, go to line (Ctrl+Alt+G).
 - Word and character count in the status bar, of the selection when one
@@ -55,7 +59,7 @@ the panel — never silently lost.
   with its links, notes and groups; opening it in filo recreates the
   whole document as a new tab, ready to be saved wherever you want.
 - Interface in English, Italian, German and French; light and dark theme;
-  configurable font (Ctrl+comma).
+  configurable font (Ctrl+comma). The Settings page lists every shortcut.
 - Errors are never silent: they show up in the status bar.
 
 The `examples/` folder contains a few sample files to try links, notes

@@ -40,7 +40,7 @@ export interface Doc {
   scroll?: StateEffect<unknown>;
   dirty: boolean;
   lang: Lang;
-  encoding: string; // "utf-8" | "windows-1252"
+  encoding: string; // "utf-8" | "windows-1252" | "utf-16le" | "utf-16be"
   eol: string; // "lf" | "crlf"
   bom: boolean;
   preview?: boolean; // Markdown shown in preview instead of the editor
@@ -66,6 +66,7 @@ const OPEN_FILTERS = [
 export const docLoadedHooks: ((doc: Doc, diskText: string) => Promise<void>)[] = [];
 export const docSavedHooks: ((doc: Doc) => Promise<void>)[] = [];
 export const docActivatedHooks: ((doc: Doc) => void)[] = [];
+export const docClosedHooks: ((doc: Doc) => void)[] = [];
 
 let view: EditorView;
 let prefs: Prefs;
@@ -251,6 +252,21 @@ export async function openWithDialog() {
   }
 }
 
+/** Replaces a document's text with a recovered draft: fresh state
+ *  (no history), marked as modified. */
+export function replaceDocText(doc: Doc, text: string, cursor: number) {
+  doc.state = buildDocState(text, doc.lang, prefs).update({
+    selection: { anchor: Math.min(cursor, text.length) },
+  }).state;
+  doc.scroll = undefined;
+  doc.dirty = true;
+  if (doc.id === activeId) {
+    view.setState(doc.state);
+    view.dispatch({ scrollIntoView: true });
+  }
+  onUpdate();
+}
+
 /** Saves a document. Returns false if the user cancelled. */
 export async function saveDoc(doc: Doc, forceDialog = false): Promise<boolean> {
   if (doc.id === activeId) syncActiveState();
@@ -351,6 +367,7 @@ export async function closeDoc(id: string): Promise<boolean> {
 
   const idx = docs.findIndex((d) => d.id === id);
   docs = docs.filter((d) => d.id !== id);
+  for (const h of docClosedHooks) h(doc);
   if (docs.length === 0) {
     newDoc(); // there is always at least one tab
     return true;

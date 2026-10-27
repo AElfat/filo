@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 
 // ── Encoding ──────────────────────────────────────────────────────────
-// filo handles UTF-8 (with or without BOM) and Windows-1252, the most
+// filo handles UTF-8 (with or without BOM), UTF-16 and Windows-1252, the most
 // common legacy encoding on Italian Windows systems.
 
 /// Windows-1252 bytes 0x80–0x9F → Unicode code point.
@@ -55,7 +55,59 @@ pub struct FileContents {
     bom: bool,
 }
 
+fn utf16_decode(bytes: &[u8], le: bool) -> String {
+    let units: Vec<u16> = bytes
+        .chunks_exact(2)
+        .map(|c| {
+            if le {
+                u16::from_le_bytes([c[0], c[1]])
+            } else {
+                u16::from_be_bytes([c[0], c[1]])
+            }
+        })
+        .collect();
+    String::from_utf16_lossy(&units)
+}
+
+/// UTF-16 without BOM (PowerShell 5 output, registry exports…): Latin
+/// text has a zero byte in every other position. Looks at the first
+/// 4 KiB; returns the endianness, or None if it doesn't look like it.
+/// Must run BEFORE the UTF-8 check: "a\0b\0" is also valid UTF-8.
+fn looks_utf16(bytes: &[u8]) -> Option<bool> {
+    if bytes.len() < 2 || bytes.len() % 2 != 0 {
+        return None;
+    }
+    let sample = &bytes[..bytes.len().min(4096)];
+    let pairs = sample.len() / 2;
+    let zeros_at = |start: usize| {
+        sample
+            .iter()
+            .skip(start)
+            .step_by(2)
+            .filter(|b| **b == 0)
+            .count()
+    };
+    let (even, odd) = (zeros_at(0), zeros_at(1));
+    if odd * 10 >= pairs * 7 && even == 0 {
+        Some(true) // little endian: the high (second) byte is zero
+    } else if even * 10 >= pairs * 7 && odd == 0 {
+        Some(false)
+    } else {
+        None
+    }
+}
+
 fn decode_bytes(raw: Vec<u8>) -> (String, String, bool) {
+    if raw.starts_with(&[0xFF, 0xFE]) {
+        return (utf16_decode(&raw[2..], true), "utf-16le".into(), true);
+    }
+    if raw.starts_with(&[0xFE, 0xFF]) {
+        return (utf16_decode(&raw[2..], false), "utf-16be".into(), true);
+    }
+    if let Some(le) = looks_utf16(&raw) {
+        let name = if le { "utf-16le" } else { "utf-16be" };
+        return (utf16_decode(&raw, le), name.into(), false);
+    }
     let (body, bom) = if raw.starts_with(&[0xEF, 0xBB, 0xBF]) {
         (raw[3..].to_vec(), true)
     } else {
@@ -64,6 +116,33 @@ fn decode_bytes(raw: Vec<u8>) -> (String, String, bool) {
     match String::from_utf8(body) {
         Ok(text) => (text, "utf-8".into(), bom),
         Err(e) => (cp1252_decode(e.as_bytes()), "windows-1252".into(), false),
+    }
+}
+
+/// Inverse of decode_bytes: text → bytes in the given encoding, with
+/// the BOM when requested (meaningless for Windows-1252).
+fn encode_text(text: &str, encoding: &str, bom: bool) -> Vec<u8> {
+    match encoding {
+        "windows-1252" => cp1252_encode(text),
+        "utf-16le" | "utf-16be" => {
+            let le = encoding == "utf-16le";
+            let mut out = Vec::with_capacity(text.len() * 2 + 2);
+            if bom {
+                out.extend_from_slice(if le { &[0xFF, 0xFE] } else { &[0xFE, 0xFF] });
+            }
+            for u in text.encode_utf16() {
+                out.extend_from_slice(&if le { u.to_le_bytes() } else { u.to_be_bytes() });
+            }
+            out
+        }
+        _ => {
+            let mut out = Vec::with_capacity(text.len() + 3);
+            if bom {
+                out.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
+            }
+            out.extend_from_slice(text.as_bytes());
+            out
+        }
     }
 }
 
@@ -156,16 +235,7 @@ fn write_file(
     } else {
         contents
     };
-    let mut bytes = if encoding == "windows-1252" {
-        cp1252_encode(&text)
-    } else {
-        text.into_bytes()
-    };
-    if bom && encoding == "utf-8" {
-        let mut with_bom = vec![0xEF, 0xBB, 0xBF];
-        with_bom.append(&mut bytes);
-        bytes = with_bom;
-    }
+    let bytes = encode_text(&text, &encoding, bom);
 
     let tmp = target.with_extension(format!(
         "{}~filotmp",
@@ -337,6 +407,77 @@ fn load_config(app: tauri::AppHandle, name: String) -> Result<Option<String>, St
 fn save_config(app: tauri::AppHandle, name: String, contents: String) -> Result<(), String> {
     let p = config_file(&app, &name)?;
     fs::write(&p, contents).map_err(|e| e.to_string())
+}
+
+// ── Drafts (crash recovery) ───────────────────────────────────────────
+// The text of every modified document is mirrored under drafts/, one
+// JSON file per document (a .filo bundle plus the original path). On a
+// clean exit they are removed; whatever is still there at the next
+// start was left by a crash and gets reopened.
+
+fn drafts_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("drafts");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+fn draft_file(app: &tauri::AppHandle, key: &str) -> Result<PathBuf, String> {
+    if key.is_empty() || !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        return Err(format!("invalid draft key: {key}"));
+    }
+    Ok(drafts_dir(app)?.join(format!("{key}.json")))
+}
+
+#[tauri::command]
+fn draft_save(app: tauri::AppHandle, key: String, contents: String) -> Result<(), String> {
+    let target = draft_file(&app, &key)?;
+    let tmp = target.with_extension("json~filotmp");
+    fs::write(&tmp, contents).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, &target).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        e.to_string()
+    })
+}
+
+#[tauri::command]
+fn draft_delete(app: tauri::AppHandle, key: String) -> Result<(), String> {
+    let p = draft_file(&app, &key)?;
+    match fs::remove_file(&p) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
+        _ => Ok(()),
+    }
+}
+
+/// Contents of every draft, oldest first.
+#[tauri::command]
+fn drafts_load(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let dir = drafts_dir(&app)?;
+    let mut files: Vec<PathBuf> = fs::read_dir(&dir)
+        .map_err(|e| e.to_string())?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().map(|x| x == "json").unwrap_or(false))
+        .collect();
+    files.sort_by_key(|p| fs::metadata(p).and_then(|m| m.modified()).ok());
+    files
+        .iter()
+        .map(|p| fs::read_to_string(p).map_err(|e| e.to_string()))
+        .collect()
+}
+
+#[tauri::command]
+fn drafts_clear(app: tauri::AppHandle) -> Result<(), String> {
+    let dir = drafts_dir(&app)?;
+    for entry in fs::read_dir(&dir).map_err(|e| e.to_string())? {
+        let p = entry.map_err(|e| e.to_string())?.path();
+        if p.is_file() {
+            fs::remove_file(&p).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
 }
 
 // ── File explorer (sidebar) ───────────────────────────────────────────
@@ -677,6 +818,10 @@ pub fn run() {
             delete_sidecar,
             load_config,
             save_config,
+            draft_save,
+            draft_delete,
+            drafts_load,
+            drafts_clear,
             list_dir,
             search_dir,
             get_cli_files
@@ -728,5 +873,65 @@ mod tests {
     #[test]
     fn cp1252_unmappable_becomes_question_mark() {
         assert_eq!(cp1252_encode("日本"), vec![b'?', b'?']);
+    }
+
+    #[test]
+    fn utf16le_bom_detected() {
+        let mut raw = vec![0xFF, 0xFE];
+        for u in "ciào".encode_utf16() {
+            raw.extend_from_slice(&u.to_le_bytes());
+        }
+        let (text, enc, bom) = decode_bytes(raw);
+        assert_eq!(text, "ciào");
+        assert_eq!(enc, "utf-16le");
+        assert!(bom);
+    }
+
+    #[test]
+    fn utf16be_bom_detected() {
+        let mut raw = vec![0xFE, 0xFF];
+        for u in "ciào".encode_utf16() {
+            raw.extend_from_slice(&u.to_be_bytes());
+        }
+        let (text, enc, bom) = decode_bytes(raw);
+        assert_eq!(text, "ciào");
+        assert_eq!(enc, "utf-16be");
+        assert!(bom);
+    }
+
+    #[test]
+    fn utf16le_without_bom_detected() {
+        // what PowerShell 5 writes: ASCII text, no BOM, zero high bytes
+        let raw = encode_text("Get-Process | Out-File\r\nseconda riga", "utf-16le", false);
+        let (text, enc, bom) = decode_bytes(raw);
+        assert_eq!(text, "Get-Process | Out-File\r\nseconda riga");
+        assert_eq!(enc, "utf-16le");
+        assert!(!bom);
+    }
+
+    #[test]
+    fn utf8_with_nul_is_not_mistaken_for_utf16() {
+        let raw = b"a\0b\0cde".to_vec(); // few zeros, odd length
+        let (_, enc, _) = decode_bytes(raw);
+        assert_eq!(enc, "utf-8");
+    }
+
+    #[test]
+    fn utf16_roundtrip_with_bom() {
+        let original = "perché 日本 € ok";
+        for enc in ["utf-16le", "utf-16be"] {
+            let bytes = encode_text(original, enc, true);
+            let (text, found, bom) = decode_bytes(bytes);
+            assert_eq!(text, original);
+            assert_eq!(found, enc);
+            assert!(bom);
+        }
+    }
+
+    #[test]
+    fn utf8_bom_written_when_requested() {
+        assert_eq!(encode_text("x", "utf-8", true), vec![0xEF, 0xBB, 0xBF, b'x']);
+        assert_eq!(encode_text("x", "utf-8", false), vec![b'x']);
+        assert_eq!(encode_text("x", "windows-1252", true), vec![b'x']);
     }
 }

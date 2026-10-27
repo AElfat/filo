@@ -925,6 +925,38 @@ button {
   gap: 14px;
 }
 
+/* shortcuts list at the bottom of the Settings page */
+.keys-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 36px 0 0;
+}
+
+.keys-group {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 20px 0 4px;
+}
+
+.keys-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  font-size: 13px;
+  padding: 3px 0;
+}
+
+.keys-row kbd {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
 .prefs-form label {
   display: flex;
   align-items: center;

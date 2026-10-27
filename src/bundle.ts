@@ -41,6 +41,8 @@ export interface Bundle {
 
 // ── Pure helpers (tested in tests/bundle.test.ts) ─────────────────────
 
+const ENCODINGS = ["utf-8", "windows-1252", "utf-16le", "utf-16be"];
+
 export function makeBundle(doc: {
   name: string;
   encoding: string;
@@ -75,7 +77,9 @@ export function parseBundle(raw: string): Bundle | null {
   return {
     filo: 1,
     name: o.name,
-    encoding: o.encoding === "windows-1252" ? "windows-1252" : "utf-8",
+    encoding: ENCODINGS.includes(o.encoding as string)
+      ? (o.encoding as string)
+      : "utf-8",
     eol: o.eol === "lf" ? "lf" : "crlf",
     bom: o.bom === true,
     text: o.text,
