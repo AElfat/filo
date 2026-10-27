@@ -42,7 +42,8 @@ the panel — never silently lost.
   both switchable with a click in the status bar.
 - Atomic saves with rotating backups: the last ten copies of every file
   are kept in `%APPDATA%\io.github.aelfat.filo\backups`.
-- Search and replace with regex and whole-word matching (Ctrl+F).
+- Search and replace with regex and whole-word matching (Ctrl+F), F3 for
+  the next match, go to line (Ctrl+Alt+G).
 - Word and character count in the status bar, of the selection when one
   exists.
 - Word wrap toggle (Alt+Z), text zoom (Ctrl+wheel, Ctrl+plus/minus/0),

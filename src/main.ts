@@ -32,6 +32,7 @@ import { jsonPathAt, minify, prettyPrint } from "./datatools";
 import * as explorer from "./explorer";
 import { showContextMenu, type CtxEntry } from "./ctxmenu";
 import { redo, selectAll, undo } from "@codemirror/commands";
+import { findNext, findPrevious } from "@codemirror/search";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { showAbout } from "./about";
 import { applyPreviewState, initPreview, isPreview, togglePreview } from "./preview";
@@ -502,6 +503,15 @@ function wireShortcuts() {
         closePrefsTab();
         return;
       }
+      // F3 / Shift+F3: next / previous match, from wherever the focus is
+      if (e.key === "F3") {
+        e.preventDefault();
+        const view = docs.getView();
+        if (e.shiftKey) findPrevious(view);
+        else findNext(view);
+        view.focus();
+        return;
+      }
       // Alt+Z: word wrap, like in real editors
       if (e.altKey && !e.ctrlKey && e.key.toLowerCase() === "z") {
         e.preventDefault();
@@ -556,7 +566,7 @@ function wireShortcuts() {
       } else if (key === "n") {
         e.preventDefault();
         createNote();
-      } else if (key === "g") {
+      } else if (key === "g" && !e.altKey) {
         e.preventDefault();
         void createGroup();
       } else if (key === "b" && !e.shiftKey) {
@@ -629,7 +639,6 @@ function wireNativeGuards() {
       const blocked =
         e.key === "F12" || // devtools
         e.key === "F5" || // reload
-        e.key === "F3" || // find in page
         e.key === "F7" || // caret browsing
         (e.ctrlKey && e.shiftKey && ["i", "j", "c"].includes(k)) || // devtools
         (e.ctrlKey && ["r", "u", "j"].includes(k)); // reload, view source…
